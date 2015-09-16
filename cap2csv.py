@@ -23,7 +23,10 @@ tsharkPara = ['-e frame.time_epoch',
             '-e wlan.sa',
             '-e wlan.fc.type',
             '-e wlan.fc.subtype',
-            '-e wlan.seq']
+            '-e wlan.fc.retry',
+            '-e frame.len',
+            '-e wlan.seq',
+            '-e wlan_mgt.fixed.beacon']
 
 tsharkCmd = '/usr/bin/tshark ' + ' '.join(tsharkPara)
 tsharkCmd += ' -T fields -E separator=,'
@@ -31,6 +34,7 @@ tsharkCmd += ' -r ' + capFile
 
 print 'Running:', tsharkCmd
 print '=========='
+sys.exit()
 content = []
 for aline in run_command(tsharkCmd):
     alist = aline.strip().split(',')
