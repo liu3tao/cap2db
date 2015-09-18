@@ -1,5 +1,6 @@
 import sys, csv, os
 import subprocess
+import urllib
 
 def run_command(command):
     p = subprocess.Popen(command,
@@ -8,8 +9,8 @@ def run_command(command):
     return iter(p.stdout.readline, b'')
 
 
-def post2Influx(statement):
-    prefix = "curl -i -XPOST 'http://localhost:8086/write?db=defcon1' --data-binary '"
+def post2Influx(statement, hostname, db):
+    prefix = "curl -i -XPOST 'http://" + hostname + "/write?db=" + db + "' --data-binary '"
     os.system(prefix + statement + "'")
 
 def write2Influx(row):
@@ -36,6 +37,7 @@ def write2Influx(row):
     frame_len   = row[14]
     frame_seq   = row[15]
     beacon_interval = row[16]
+    ssid        = row[17]
         
 
     tstamp = epoch_time[:10] + epoch_time[11:]
@@ -57,6 +59,8 @@ def write2Influx(row):
         st += ',fc_subtype=' + fcsubtype
     if fcretry:
         st += ',fc_retry=' + fcretry
+    if ssid:
+        st += ',ssid='+urllib.quote(ssid)
     # value
     st += ' '
     if not frame_len:
@@ -87,9 +91,9 @@ def write2Influx(row):
     write2Influx.buffer += st
     if write2Influx.count > 99:
         print '---'
-        #print write2Influx.buffer
+        #print write2Influx.buffer, sys.argv[1], sys.argv[2]
         #sys.exit(0)
-        post2Influx(write2Influx.buffer)
+        post2Influx(write2Influx.buffer, sys.argv[2], sys.argv[3])
         write2Influx.buffer = ''
         write2Influx.count = 0
     else:
@@ -99,12 +103,8 @@ def write2Influx(row):
 write2Influx.count = 0
 write2Influx.buffer = ''
 
-def post2Influx(statement):
-    prefix = "curl -i -XPOST 'http://localhost:8086/write?db=live' --data-binary '"
-    os.system(prefix + statement + "'")
-
-if len(sys.argv) != 2:
-    print 'Usage:', sys.argv[0], 'interface'
+if len(sys.argv) != 4:
+    print 'Usage:', sys.argv[0], 'interface', 'db_host', 'db_name'
 
 tsharkPara = ['-e frame.time_epoch',
             '-e wlan.channel',
@@ -122,7 +122,8 @@ tsharkPara = ['-e frame.time_epoch',
             '-e wlan.fc.retry',
             '-e frame.len',
             '-e wlan.seq',
-            '-e wlan_mgt.fixed.beacon']
+            '-e wlan_mgt.fixed.beacon',
+            '-e wlan_mgt.ssid']
 
 tsharkCmd = '/usr/bin/tshark ' + ' '.join(tsharkPara)
 tsharkCmd += ' -T fields -E separator=,'
