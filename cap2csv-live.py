@@ -1,4 +1,4 @@
-import sys, csv, os
+import sys, csv, os, time
 import subprocess
 import urllib
 
@@ -89,15 +89,17 @@ def write2Influx(row):
     
     write2Influx.count += 1
     write2Influx.buffer += st
-    if write2Influx.count > 99:
-        print '---'
+    if len(write2Influx.buffer) > 50000:
+        print '---- WRITE', write2Influx.count, 'PACKETS ----'
+        t0 = time.time()
         #print write2Influx.buffer, sys.argv[1], sys.argv[2]
         #sys.exit(0)
         post2Influx(write2Influx.buffer, sys.argv[2], sys.argv[3])
+        print '---- DONE IN', time.time() - t0, 'SECONDS ----'
         write2Influx.buffer = ''
         write2Influx.count = 0
-    else:
-        print '\r\r'+ str(write2Influx.count),
+    elif write2Influx.count % 100 == 0:
+        print str(write2Influx.count)
     
 # init the counter
 write2Influx.count = 0
@@ -132,15 +134,18 @@ tsharkCmd += ' -i ' + sys.argv[1]
 print 'Running:', tsharkCmd
 print '=========='
 content = []
+startT = time.time()
 for aline in run_command(tsharkCmd):
     alist = aline.strip().split(',')
     if len(alist) != len(tsharkPara):
-        print "error! # of fields =", len(alist), 'should be', len(tsharkPara)
+        print "error! # of fields =", len(alist), 'should be', len(tsharkPara), aline
         continue
     
     # print alist
     # Write to database
     write2Influx(alist)
+    if time.time() - startT > 3600: # exit after 1 hour to prevent pipe overflow.
+        break
 print '=========='
 
 print 'All done!'
